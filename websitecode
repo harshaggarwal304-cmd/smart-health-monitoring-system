@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<!-- HTML5 Document Type Declaration -->
+<html lang="en">
+<head>
+    <!-- HEAD SECTION: Metadata and external resources -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Diagnostics - Digital Medical Kit</title>
+    
+    <!-- EXTERNAL JAVASCRIPT LIBRARIES -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- jsPDF: PDF generation library -->
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Chart.js: Graph creation library -->
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.2.0/tf.min.js"></script>
+    <!-- TensorFlow.js: AI/Machine Learning library for patient analysis -->
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase: Real-time database connection for sensor data -->
+    
+    <style>
+        /* ============================================
+           CSS STYLING - All visual design
+           ============================================ */
+        
+        /* UNIVERSAL RESET */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+        }
+
+        /* ============================================
+           AI NOTIFICATION POPUP STYLING
+           ============================================ */
+        
+        /* Overlay background for popup */
+        .notification-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7); /* Semi-transparent black */
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 10000; /* On top of everything */
+            animation: fadeIn 0.3s ease; /* Fade in animation */
+        }
+
+        /* Popup container */
+        .notification-popup {
+            background: white;
+            border-radius: 15px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            overflow: hidden;
+            animation: slideDown 0.4s ease; /* Slide down animation */
+        }
+
+        /* Popup header - changes color based on health status */
+        .notification-header {
+            padding: 25px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* Normal health status - green */
+        .notification-header.normal {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        /* Warning status - yellow/orange */
+        .notification-header.warning {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+        }
+
+        /* Critical status - red */
+        .notification-header.critical {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+
+        /* Icon in popup header */
+        .notification-icon {
+            font-size: 48px;
+        }
+
+        /* Header text container */
+        .notification-header-text h2 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .notification-header-text p {
+            font-size: 14px;
+            opacity: 0.95;
+        }
+
+        /* Popup body content */
+        .notification-body {
+            padding: 30px;
+            max-height: 400px;
+            overflow-y: auto; /* Scrollable if content is long */
+        }
+
+        /* AI analysis section */
+        .ai-analysis {
+            background: #f8f9fa;
+            border-left: 4px solid #0066cc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .ai-analysis h3 {
+            color: #003d82;
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Vital status indicators */
+        .vital-status {
+            margin: 12px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+        }
+
+        .vital-status-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        /* Status badge - shows Normal/Warning/Critical */
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.normal {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-badge.critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Recommendations section */
+        .recommendations {
+            margin-top: 20px;
+        }
+
+        .recommendations h4 {
+            color: #003d82;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .recommendations ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .recommendations li {
+            padding: 10px;
+            margin: 8px 0;
+            background: #e7f3ff;
+            border-left: 3px solid #0066cc;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #495057;
+        }
+
+        /* Close button */
+        .btn-close-notification {
+            width: 100%;
+            padding: 15px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-close-notification:hover {
+            background: #5a6268;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideDown {
+            from { 
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to { 
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* AI Analysis Button */
+        .btn-ai-analyze {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+
+        .btn-ai-analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        /* ============================================
+           AUTHENTICATION PAGES STYLING
+           ============================================ */
+        
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        }
+
+        .auth-box {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 450px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .auth-header {
+            background: #003d82;
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .auth-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .auth-body {
+            padding: 40px 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #0066cc;
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #0066cc;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0052a3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+        }
+
+        .auth-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .auth-link a {
+            color: #0066cc;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .auth-link a:hover {
+            text-decoration: underline;
+        }
+
+        /* ============================================
+           DASHBOARD LAYOUT
+           ============================================ */
+        
+        .dashboard {
+            display: none;
+        }
+
+        .top-bar {
+            background: #003d82;
+            color: white;
+            padding: 10px 40px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar {
+            background: white;
+            border-bottom: 3px solid #0066cc;
+            padding: 15px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            background: #0066cc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+
+        .logo-text h1 {
+            font-size: 20px;
+            color: #003d82;
+            font-weight: 600;
+        }
+
+        .logo-text p {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info {
+            text-align: right;
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #003d82;
+        }
+
+        .user-id {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .btn-logout {
+            padding: 8px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-logout:hover {
+            background: #c82333;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 30px 40px;
+        }
+
+        /* ============================================
+           PANELS & CARDS
+           ============================================ */
+        
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 25px;
+        }
+
+        .panel-header {
+            background: #f8f9fa;
+            padding: 20px 25px;
+            border-bottom: 2px solid #0066cc;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #003d82;
+        }
+
+        .panel-body {
+            padding: 25px;
+        }
+
+        /* ============================================
+           VITAL SIGNS STYLING
+           ============================================ */
+        
+        .vitals-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .vital-box {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            border-left: 5px solid #0066cc;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+
+        .vital-box:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+
+        .vital-box.temp { border-left-color: #dc3545; }
+        .vital-box.humidity { border-left-color: #17a2b8; }
+        .vital-box.body-temp { border-left-color: #fd7e14; }
+        .vital-box.oxygen { border-left-color: #28a745; }
+        .vital-box.heart-rate { border-left-color: #e83e8c; }
+        .vital-box.ecg-value { border-left-color: #6f42c1; }
+        .vital-box.gsr-value { border-left-color: #20c997; }
+
+        .vital-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        /* Heart rate pulse animation */
+        .heart-icon {
+            display: inline-block;
+            color: #e83e8c;
+            animation: heartbeat 1.2s infinite;
+            margin-right: 5px;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            10% { transform: scale(1.1); }
+            20% { transform: scale(1); }
+            30% { transform: scale(1.15); }
+            40% { transform: scale(1); }
+        }
+
+        .vital-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin: 10px 0;
+            color: #212529;
+        }
+
+        .vital-unit {
+            font-size: 16px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        /* ============================================
+           CHARTS STYLING
+           ============================================ */
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            color: #003d82;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .btn-generate {
+            background: #28a745;
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+
+        .btn-generate:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+
+        /* Voice buttons: same design language as .btn-generate */
+        .btn-voice {
+            background: #0d6efd; /* blue variant */
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        .btn-voice:hover {
+            background: #0b5ed7;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+        }
+
+        .btn-voice-stop {
+            background: #dc3545; /* red variant */
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        .btn-voice-stop:hover {
+            background: #bb2d3b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* ============================================
+           HAMBURGER MENU (3 Lines) STYLING
+           ============================================ */
+        
+        /* Hamburger menu button - 3 lines */
+        .hamburger-menu {
+            position: fixed;
+            top: 80px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: #0066cc;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none; /* Hidden until user logs in */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+            transition: all 0.3s;
+        }
+
+        .hamburger-menu:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 102, 204, 0.6);
+        }
+
+        /* Individual lines in hamburger */
+        .hamburger-line {
+            width: 25px;
+            height: 3px;
+            background: white;
+            border-radius: 2px;
+            transition: all 0.3s;
+        }
+
+        /* Animated hamburger when menu is open */
+        .hamburger-menu.active .hamburger-line:nth-child(1) {
+            transform: rotate(45deg) translate(7px, 7px);
+        }
+
+        .hamburger-menu.active .hamburger-line:nth-child(2) {
+            opacity: 0;
+        }
+
+        .hamburger-menu.active .hamburger-line:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -7px);
+        }
+
+        /* Reports sidebar panel */
+        .reports-sidebar {
+            position: fixed;
+            top: 0;
+            right: -450px; /* Hidden off-screen */
+            width: 450px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 25px rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            transition: right 0.4s ease;
+            overflow-y: auto;
+        }
+
+        /* Sidebar when open */
+        .reports-sidebar.open {
+            right: 0;
+        }
+
+        /* Sidebar header */
+        .reports-header {
+            background: #003d82;
+            color: white;
+            padding: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reports-header h2 {
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .close-sidebar {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
+            padding: 0;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .close-sidebar:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Reports content area */
+        .reports-content {
+            padding: 25px;
+        }
+
+        /* Individual report card */
+        .report-card {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-left: 4px solid #0066cc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .report-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateX(-5px);
+        }
+
+        .report-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .report-date {
+            font-size: 14px;
+            font-weight: 600;
+            color: #003d82;
+        }
+
+        .report-status {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .report-status.normal {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .report-status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .report-status.critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .report-vitals {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+            font-size: 13px;
+            color: #495057;
+        }
+
+        .report-vitals div {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .report-vitals span:first-child {
+            font-weight: 600;
+        }
+
+        .report-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-view-report, .btn-download-report {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-view-report {
+            background: #0066cc;
+            color: white;
+        }
+
+        .btn-view-report:hover {
+            background: #0052a3;
+        }
+
+        .btn-download-report {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-download-report:hover {
+            background: #218838;
+        }
+
+        .no-reports {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }
+
+        .no-reports-icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        /* Overlay when sidebar is open */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+            display: none;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* Info section styling */
+        .info-banner {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .info-banner h2 {
+            color: #003d82;
+            font-size: 24px;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #0066cc;
+            padding-bottom: 10px;
+        }
+
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .parameter-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-left: 4px solid #0066cc;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .parameter-card h3 {
+            color: #003d82;
+            font-size: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .parameter-icon {
+            font-size: 24px;
+        }
+
+        .parameter-card p {
+            color: #495057;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .parameter-card .normal-range {
+            background: #e7f3ff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #0066cc;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- ============================================
+         AI NOTIFICATION POPUP (Initially Hidden)
+         ============================================ -->
+    <div id="notificationOverlay" class="notification-overlay">
+        <!-- Overlay background - darkens screen -->
+        
+        <div class="notification-popup">
+            <!-- Popup container -->
+            
+            <div id="notificationHeader" class="notification-header normal">
+                <!-- Header - color changes based on health status -->
+                
+                <div class="notification-icon" id="notificationIcon">🤖</div>
+                <!-- AI robot icon -->
+                
+                <div class="notification-header-text">
+                    <h2 id="notificationTitle">Health Analysis Report</h2>
+                    <p id="notificationSubtitle">Advanced Diagnostic System</p>
+                </div>
+            </div>
+            
+            <div class="notification-body">
+                <!-- Popup content area -->
+                
+                <div class="ai-analysis">
+                    <!-- Health analysis section -->
+                    <h3>🧠 Health Assessment</h3>
+                    <p id="aiDiagnosis" style="color: #495057; line-height: 1.6; margin-bottom: 15px;">
+                        <!-- Health diagnosis text inserted here by JavaScript -->
+                    </p>
+                    
+                    <!-- Vital signs status indicators -->
+                    <div id="vitalStatusList">
+                        <!-- Dynamically filled by JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="recommendations">
+                    <!-- Recommendations section -->
+                    <h4>💡 Recommendations</h4>
+                    <ul id="recommendationsList">
+                        <!-- Dynamically filled by JavaScript -->
+                    </ul>
+                </div>
+                
+                <button class="btn-close-notification" onclick="closeNotification()">Close</button>
+                <!-- Close button -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         LOGIN PAGE
+         ============================================ -->
+    <div id="loginPage" class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <div style="font-size: 48px; margin-bottom: 10px;">⚕</div>
+                <h1>Digital Medical Kit</h1>
+                <p>Advanced Patient Monitoring System</p>
+            </div>
+            <div class="auth-body">
+                <h2 style="text-align: center; color: #003d82; margin-bottom: 25px;">Login to Dashboard</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label class="form-label">Patient ID / Mobile Number</label>
+                        <input type="text" class="form-input" id="loginId" required placeholder="Enter your ID or mobile">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="loginPassword" required placeholder="Enter password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Role</label>
+                        <select class="form-input" id="loginRole" required>
+                            <option value="patient" selected>Patient</option>
+                            <option value="doctor">Doctor</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <div class="auth-link">
+                    Don't have an account? <a href="#" onclick="showSignup()">Sign Up</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         SIGNUP PAGE
+         ============================================ -->
+    <div id="signupPage" class="auth-container hidden">
+        <div class="auth-box">
+            <div class="auth-header">
+                <div style="font-size: 48px; margin-bottom: 10px;">⚕</div>
+                <h1>Digital Medical Kit</h1>
+                <p>Create Your Account</p>
+            </div>
+            <div class="auth-body">
+                <h2 style="text-align: center; color: #003d82; margin-bottom: 25px;">Patient Registration</h2>
+                <form id="signupForm">
+                    <div class="form-group">
+                        <label class="form-label">Full Name *</label>
+                        <input type="text" class="form-input" id="signupName" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Age *</label>
+                        <input type="number" class="form-input" id="signupAge" required min="0" max="150">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Gender *</label>
+                        <select class="form-input" id="signupGender" required>
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mobile Number *</label>
+                        <input type="tel" class="form-input" id="signupMobile" required pattern="[0-9]{10}" placeholder="10-digit mobile number">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password *</label>
+                        <input type="password" class="form-input" id="signupPassword" required minlength="6" placeholder="Minimum 6 characters">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                </form>
+                <div class="auth-link">
+                    Already have an account? <a href="#" onclick="showLogin()">Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         DASHBOARD (Main Application)
+         ============================================ -->
+    <div id="dashboard" class="dashboard">
+        <!-- Hamburger Menu Button (3 Lines) -->
+        <div class="hamburger-menu" id="hamburgerMenu" onclick="toggleReportsSidebar()">
+            <div class="hamburger-line"></div>
+            <div class="hamburger-line"></div>
+            <div class="hamburger-line"></div>
+        </div>
+
+        <!-- Overlay for sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleReportsSidebar()"></div>
+
+        <!-- Reports Sidebar Panel -->
+        <div class="reports-sidebar" id="reportsSidebar">
+            <div class="reports-header">
+                <h2>📋 My Reports</h2>
+                <button class="close-sidebar" onclick="toggleReportsSidebar()">×</button>
+            </div>
+            <div class="reports-content" id="reportsContent">
+                <!-- Reports will be dynamically loaded here -->
+                <div class="no-reports">
+                    <div class="no-reports-icon">📄</div>
+                    <h3>No Reports Yet</h3>
+                    <p>Generate your first health report to see it here</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- DOCTOR DASHBOARD VIEW -->
+        <div id="doctorView" class="hidden" style="padding: 20px;">
+            <div class="top-bar">
+                <div class="brand">Digital Medical Kit · Doctor</div>
+                <div class="user-info">
+                    <span id="docUserName">Doctor</span>
+                    <span id="docUserId" class="user-id"></span>
+                    <button class="btn-logout" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">👥 Patients</div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="patientsList" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 12px;"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">🚨 Alerts</div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="alertsList">
+                            <div class="empty-state">No alerts yet</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">🩺 Selected Patient</div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="selectedPatientDetails">Select a patient to view details</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-bar" id="patientTopBar">
+            <div>📞 Emergency: +91-1800-XXX-XXXX | 📧 support@digitalmedicalkit.com</div>
+            <div id="currentTime"></div>
+        </div>
+
+        <div class="navbar">
+            <div class="logo-section">
+                <div class="logo-icon">⚕</div>
+                <div class="logo-text">
+                    <h1>Digital Medical Kit</h1>
+                    <p>Real-Time Health Monitoring</p>
+                </div>
+            </div>
+            <div class="user-section">
+                <div class="user-info">
+                    <div class="user-name" id="userName"></div>
+                    <div class="user-id" id="userIdDisplay"></div>
+                </div>
+                <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- VITAL SIGNS SECTION -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">🔴 Real-Time Vital Signs</div>
+                </div>
+                <div class="panel-body">
+                    <div class="vitals-grid">
+                        <div class="vital-box temp">
+                            <div class="vital-label">Room Temperature</div>
+                            <div class="vital-value" id="roomTemp">25.4</div>
+                            <div class="vital-unit">°C</div>
+                        </div>
+                        <div class="vital-box humidity">
+                            <div class="vital-label">Humidity Level</div>
+                            <div class="vital-value" id="humidity">62</div>
+                            <div class="vital-unit">%RH</div>
+                        </div>
+                        <div class="vital-box body-temp">
+                            <div class="vital-label">Body Temperature</div>
+                            <div class="vital-value" id="bodyTemp">36.8</div>
+                            <div class="vital-unit">°C</div>
+                        </div>
+                        <div class="vital-box heart-rate">
+                            <div class="vital-label"><span class="heart-icon">❤️</span>Heart Rate</div>
+                            <div class="vital-value" id="heartRate">72</div>
+                            <div class="vital-unit">BPM</div>
+                        </div>
+                        <div class="vital-box oxygen">
+                            <div class="vital-label">SpO2 (Oxygen)</div>
+                            <div class="vital-value" id="spo2">98</div>
+                            <div class="vital-unit">%</div>
+                        </div>
+                        <div class="vital-box ecg-value">
+                            <div class="vital-label">ECG Signal</div>
+                            <div class="vital-value" id="ecgValue">0.85</div>
+                            <div class="vital-unit">mV</div>
+                        </div>
+                        <div class="vital-box gsr-value">
+                            <div class="vital-label">GSR Level</div>
+                            <div class="vital-value" id="gsrValue">45</div>
+                            <div class="vital-unit">µS</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHARTS SECTION -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">📈 Live Monitoring Graphs</div>
+                </div>
+                <div class="panel-body">
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <div class="chart-title">❤️ ECG Monitor (Heart Activity)</div>
+                            <canvas id="ecgChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <div class="chart-title">⚡ GSR Sensor (Stress Level)</div>
+                            <canvas id="gsrChart"></canvas>
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <!-- Health Analysis Button -->
+                        <button class="btn-ai-analyze" onclick="runAIAnalysis()">🔬 Run Health Analysis</button>
+                        <!-- PDF Generation Button -->
+                        <button class="btn-generate" onclick="generatePDF()">📄 Generate Medical Report (PDF)</button>
+                        <!-- Accessibility: Read Report Aloud (improved UI) -->
+                        <button class="btn-voice" onclick="speakReport()">🔈 Read Report Aloud</button>
+                        <button class="btn-voice-stop" onclick="stopSpeech()">⏹️ Stop</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INFORMATION SECTION -->
+            <div class="info-banner">
+                <h2>📊 Understanding Your Health Parameters</h2>
+                <p style="color: #666; margin-bottom: 20px;">Our Digital Medical Kit monitors vital parameters and uses advanced algorithms to provide intelligent health insights:</p>
+                
+                <div class="parameters-grid">
+                    <div class="parameter-card">
+                        <h3><span class="parameter-icon">🌡️</span> Room Temperature</h3>
+                        <p>Monitors ambient temperature. Ideal temperature ensures comfort and affects body's thermal regulation.</p>
+                        <div class="normal-range">Normal: 20-26°C</div>
+                    </div>
+                    <div class="parameter-card">
+                        <h3><span class="parameter-icon">💧</span> Humidity Level</h3>
+                        <p>Measures moisture content in air. Proper humidity prevents respiratory discomfort and skin dryness.</p>
+                        <div class="normal-range">Normal: 30-60% RH</div>
+                    </div>
+                    <div class="parameter-card">
+                        <h3><span class="parameter-icon">🌡️</span> Body Temperature</h3>
+                        <p>Tracks core body temperature. Essential indicator of metabolic rate and potential fever.</p>
+                        <div class="normal-range">Normal: 36.1-37.2°C</div>
+                    </div>
+                    <div class="parameter-card">
+                        <h3><span class="parameter-icon">🫁</span> SpO2 (Oxygen Saturation)</h3>
+                        <p>Measures blood oxygen levels. Critical for assessing respiratory function.</p>
+                        <div class="normal-range">Normal: 95-100%</div>
+                    </div>
+                    <div class="parameter-card">
+                        <h3><span class="parameter-icon">❤️</span> Heart Rate (Pulse)</h3>
+                        <p>Measures heartbeats per minute. Indicates cardiovascular health and fitness level. Essential for detecting arrhythmias.</p>
+                        <div class="normal-range">Normal: 60-100 BPM (resting)</div>
+                    </div>
+                    <div class="parameter-card">
+                        <h3><span class="parameter-icon">❤️</span> ECG (Electrocardiogram)</h3>
+                        <p>Records heart's electrical activity. Detects irregular heartbeats and cardiac conditions. Measured in millivolts (mV).</p>
+                        <div class="normal-range">Normal: 0.5-2.0 mV (QRS amplitude)</div>
+                    </div>
+                    <div class="parameter-card">
+                        <h3><span class="parameter-icon">⚡</span> GSR (Galvanic Skin Response)</h3>
+                        <p>Measures skin conductance. Indicates stress levels and emotional arousal. Higher values suggest increased stress or arousal.</p>
+                        <div class="normal-range">Normal: 10-80 µS (varies by individual)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ============================================
+           JAVASCRIPT CODE - Application Logic
+           ============================================ */
+        
+        // GLOBAL VARIABLES - Store application state
+        let currentRole = 'patient'; // Current role: 'patient' or 'doctor'
+        let users = {
+            // Demo Doctor
+            '9999999999': { name: 'Dr. XYZ', age: 40, gender: 'Other', mobile: '9999999999', password: 'doctor123', role: 'doctor', registeredDate: new Date().toISOString() },
+            // Demo Patient
+            '8888888888': { name: 'Patient Demo', age: 30, gender: 'Male', mobile: '8888888888', password: 'patient123', role: 'patient', registeredDate: new Date().toISOString() }
+        };              // Store registered users
+        let currentUser = null;      // Currently logged in user
+        let ecgChart, gsrChart;      // Chart.js instances
+        let ecgData = [];            // ECG graph data
+        let gsrData = [];            // GSR graph data
+        let currentVitals = {};      // Store current vital readings
+        let userReports = {
+            '8888888888': [
+                {
+                    vitals: { roomTemp: 25.2, humidity: 55, bodyTemp: 36.9, heartRate: 78, spo2: 97, ecgValue: 0.9, gsrValue: 42 },
+                    analysis: { status: 'warning', diagnosis: 'Mild tachycardia observed. Recommend hydration and rest.', recommendations: ['Drink water', 'Avoid strenuous activity for 24h'], vitals: { roomTemp: 25.2, humidity: 55, bodyTemp: 36.9, heartRate: 110, spo2: 97, ecgValue: 0.9, gsrValue: 42 }, timestamp: new Date().toLocaleString() },
+                    date: new Date().toLocaleDateString(),
+                    timestamp: Date.now() - 86400000
+                }
+            ]
+        };        // Store all user reports (key: mobile number, value: array of reports)
+        let doctorAlerts = [];       // Aggregated alerts for doctor view
+        let recognition = null;      // Speech recognition instance
+        let supabase = null;         // Supabase client instance
+        let realtimeChannel = null;  // Supabase realtime channel
+
+        /* ============================================
+           SUPABASE REAL-TIME DATABASE CONNECTION
+           Connects to Supabase for live sensor data
+           ============================================ */
+        
+        // Function: Initialize Supabase connection
+        function initSupabase() {
+            try {
+                // Create Supabase client with your project credentials
+                const { createClient } = window.supabase;
+                
+                supabase = createClient(
+                    'https://oiugvnbvttsfjhxhgodj.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pdWd2bmJ2dHRzZmpoeGhnb2RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4NjA0NTIsImV4cCI6MjA3NjQzNjQ1Mn0.dJoQcEm4gRuZ1BNYLwKNLpgPNsiKo-ljo1PaJgZS3kU'
+                );
+
+                console.log('✅ Supabase client initialized successfully');
+                console.log('🔗 Connected to: https://oiugvnbvttsfjhxhgodj.supabase.co');
+                
+                // Test database connection
+                testConnection();
+            } catch (error) {
+                console.error('❌ Failed to initialize Supabase:', error);
+            }
+        }
+
+        // Function: Test Supabase database connection
+        async function testConnection() {
+            if (!supabase) {
+                console.error('❌ Supabase not initialized');
+                return;
+            }
+
+            try {
+                console.log('🔍 Testing database connection...');
+                
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .limit(1);
+                    
+                if (error) throw error;
+                
+                console.log('✅ Supabase connection successful');
+                if (data && data.length > 0) {
+                    console.log('📊 Sample data retrieved:', data[0]);
+                } else {
+                    console.log('ℹ️ Database is empty, waiting for sensor readings...');
+                }
+            } catch (error) {
+                console.error('❌ Supabase connection error:', error.message);
+                console.error('💡 Please check:');
+                console.error('   1. Table "sensor_readings" exists in your database');
+                console.error('   2. Row Level Security (RLS) policies allow SELECT');
+                console.error('   3. Your Supabase URL and API key are correct');
+            }
+        }
+
+        // Function: Subscribe to real-time sensor data updates
+        function subscribeToSensorData() {
+            if (!supabase) {
+                console.error('❌ Supabase not initialized');
+                return;
+            }
+
+            try {
+                console.log('🔌 Setting up real-time subscription...');
+                
+                // Subscribe to sensor_readings table for real-time INSERT events
+                realtimeChannel = supabase
+                    .channel('sensor_readings_channel')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'sensor_readings'
+                        },
+                        (payload) => {
+                            console.log('📡 New sensor data received from database:');
+                            console.log(payload.new);
+                            updateDashboardFromSupabase(payload.new);
+                        }
+                    )
+                    .subscribe((status) => {
+                        console.log('📻 Subscription status:', status);
+                        
+                        if (status === 'SUBSCRIBED') {
+                            console.log('✅ Successfully subscribed to real-time sensor data');
+                            console.log('📊 Listening for new readings in sensor_readings table...');
+                            console.log('💡 Insert a new row to see real-time updates!');
+                        } else if (status === 'CHANNEL_ERROR') {
+                            console.error('❌ Error subscribing to channel');
+                            console.error('💡 Check your Supabase Realtime settings');
+                        } else if (status === 'TIMED_OUT') {
+                            console.error('⏱️ Subscription timed out');
+                            console.error('💡 Try refreshing the page');
+                        } else if (status === 'CLOSED') {
+                            console.log('🔌 Channel closed');
+                        }
+                    });
+            } catch (error) {
+                console.error('❌ Error subscribing to sensor data:', error);
+            }
+        }
+
+        // Function: Unsubscribe from real-time updates
+        function unsubscribeFromSensorData() {
+            if (realtimeChannel) {
+                supabase.removeChannel(realtimeChannel);
+                realtimeChannel = null;
+                console.log('🔌 Unsubscribed from sensor data channel');
+            }
+        }
+
+        // Function: Update dashboard with real Supabase data
+        function updateDashboardFromSupabase(data) {
+            console.log('🔄 Updating dashboard with sensor data...');
+            
+            // Update Body Temperature
+            if (data.body_temp !== null && data.body_temp !== undefined) {
+                document.getElementById('bodyTemp').textContent = parseFloat(data.body_temp).toFixed(1);
+                console.log('🌡️ Body Temp updated:', data.body_temp);
+            }
+            
+            // Update Room Temperature
+            if (data.room_temp !== null && data.room_temp !== undefined) {
+                document.getElementById('roomTemp').textContent = parseFloat(data.room_temp).toFixed(1);
+                console.log('🌡️ Room Temp updated:', data.room_temp);
+            }
+            
+            // Update Humidity
+            if (data.humidity !== null && data.humidity !== undefined) {
+                document.getElementById('humidity').textContent = Math.floor(parseFloat(data.humidity));
+                console.log('💧 Humidity updated:', data.humidity);
+            }
+            
+            // Update SpO2
+            if (data.spo2 !== null && data.spo2 !== undefined) {
+                document.getElementById('spo2').textContent = parseInt(data.spo2);
+                console.log('🫁 SpO2 updated:', data.spo2);
+            }
+            
+            // Update Heart Rate
+            if (data.heart_rate !== null && data.heart_rate !== undefined) {
+                document.getElementById('heartRate').textContent = parseInt(data.heart_rate);
+                console.log('❤️ Heart Rate updated:', data.heart_rate);
+            }
+            
+            // Update ECG Value
+            if (data.ecg_value !== null && data.ecg_value !== undefined) {
+                const ecgVal = parseFloat(data.ecg_value);
+                document.getElementById('ecgValue').textContent = ecgVal.toFixed(2);
+                updateECGFromSupabase(ecgVal);
+                console.log('📈 ECG updated:', data.ecg_value);
+            }
+            
+            // Update GSR Value
+            if (data.gsr_value !== null && data.gsr_value !== undefined) {
+                const gsrVal = parseFloat(data.gsr_value);
+                document.getElementById('gsrValue').textContent = Math.floor(gsrVal);
+                updateGSRFromSupabase(gsrVal);
+                console.log('⚡ GSR updated:', data.gsr_value);
+            }
+
+            console.log('✅ Dashboard updated successfully with real sensor data');
+            
+            // Optional background analysis without popup (keeps doctor alerts updated)
+            setTimeout(() => {
+                const vitals = {
+                    roomTemp: parseFloat(document.getElementById('roomTemp').textContent),
+                    humidity: parseFloat(document.getElementById('humidity').textContent),
+                    bodyTemp: parseFloat(document.getElementById('bodyTemp').textContent),
+                    heartRate: parseFloat(document.getElementById('heartRate').textContent),
+                    spo2: parseFloat(document.getElementById('spo2').textContent),
+                    ecgValue: parseFloat(document.getElementById('ecgValue').textContent),
+                    gsrValue: parseFloat(document.getElementById('gsrValue').textContent)
+                };
+                const analysis = analyzeVitals(vitals);
+                currentVitals.lastAnalysis = analysis;
+                // Do NOT popup automatically; only update doctor alerts silently
+                if (analysis.status === 'critical' || analysis.status === 'warning') {
+                    pushAlert({
+                        level: analysis.status,
+                        message: analysis.diagnosis,
+                        patientId: currentUser ? currentUser.mobile : 'N/A',
+                        patientName: currentUser ? currentUser.name : 'Unknown',
+                        timestamp: analysis.timestamp
+                    });
+                }
+            }, 500);
+        }
+
+        // Function: Update ECG chart with real data
+        function updateECGFromSupabase(value) {
+            if (!ecgChart || !gsrChart) {
+                try { initCharts(); } catch (_) {}
+            }
+            // Add real ECG value to chart
+            ecgData.push(value);
+            if (ecgData.length > 50) ecgData.shift(); // Keep last 50 points
+
+            ecgChart.data.labels = ecgData.map((_, i) => i);
+            ecgChart.data.datasets[0].data = ecgData;
+            ecgChart.update('none'); // Update without animation for smooth real-time
+        }
+
+        // Function: Update GSR chart with real data
+        function updateGSRFromSupabase(value) {
+            if (!ecgChart || !gsrChart) {
+                try { initCharts(); } catch (_) {}
+            }
+            // Add real GSR value to chart
+            gsrData.push(value);
+            if (gsrData.length > 50) gsrData.shift(); // Keep last 50 points
+
+            gsrChart.data.labels = gsrData.map((_, i) => i);
+            gsrChart.data.datasets[0].data = gsrData;
+            gsrChart.update('none'); // Update without animation for smooth real-time
+        }
+
+        // Function: Fetch latest sensor data from database on initial load
+        async function fetchLatestSensorData() {
+            if (!supabase) {
+                console.warn('⚠️ Supabase not initialized, skipping fetch');
+                return;
+            }
+
+            try {
+                console.log('🔍 Fetching latest sensor data from database...');
+                
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (error) {
+                    console.error('❌ Error fetching sensor data:', error.message);
+                    console.log('💡 Tip: Make sure your sensor_readings table exists and has data');
+                    return;
+                }
+
+                if (data) {
+                    console.log('✅ Latest sensor data fetched successfully:');
+                    console.log(data);
+                    updateDashboardFromSupabase(data);
+                } else {
+                    console.log('ℹ️ No sensor data found in database yet');
+                    console.log('💡 Insert a row into sensor_readings table to see real-time updates');
+                }
+            } catch (err) {
+                console.error('❌ Exception while fetching data:', err);
+            }
+        }
+
+        // Function: Save sensor reading to database (if needed for manual entry)
+        async function saveSensorReading(vitals) {
+            if (!supabase) {
+                console.error('❌ Supabase not initialized');
+                return false;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .insert([
+                        {
+                            body_temp: vitals.bodyTemp,
+                            heart_rate: vitals.heartRate,
+                            spo2: vitals.spo2,
+                            room_temp: vitals.roomTemp,
+                            humidity: vitals.humidity,
+                            ecg_value: vitals.ecgValue,
+                            gsr_value: vitals.gsrValue
+                        }
+                    ])
+                    .select();
+
+                if (error) {
+                    console.error('❌ Error saving sensor reading:', error);
+                    return false;
+                }
+
+                console.log('✅ Sensor reading saved to database:', data);
+                return true;
+            } catch (err) {
+                console.error('❌ Exception saving sensor reading:', err);
+                return false;
+            }
+        }
+
+        /* ============================================
+           REPORTS SIDEBAR FUNCTIONS
+           ============================================ */
+        
+        // Function: Toggle reports sidebar open/close
+        function toggleReportsSidebar() {
+            const sidebar = document.getElementById('reportsSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const hamburger = document.getElementById('hamburgerMenu');
+            
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+            hamburger.classList.toggle('active');
+            
+            // Load reports when opening
+            if (sidebar.classList.contains('open')) {
+                loadUserReports();
+            }
+        }
+
+        // Function: Load and display user's reports
+        function loadUserReports() {
+            const reportsContent = document.getElementById('reportsContent');
+            
+            if (!currentUser) {
+                reportsContent.innerHTML = `
+                    <div class="no-reports">
+                        <div class="no-reports-icon">⚠️</div>
+                        <h3>Not Logged In</h3>
+                        <p>Please login to view your reports</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Get user's reports
+            const reports = userReports[currentUser.mobile] || [];
+            
+            if (reports.length === 0) {
+                reportsContent.innerHTML = `
+                    <div class="no-reports">
+                        <div class="no-reports-icon">📄</div>
+                        <h3>No Reports Yet</h3>
+                        <p>Generate your first health report to see it here</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Display reports (newest first)
+            let html = '';
+            reports.reverse().forEach((report, index) => {
+                const statusClass = report.analysis.status;
+                const statusText = statusClass === 'normal' ? 'Normal' : 
+                                 statusClass === 'warning' ? 'Warning' : 'Critical';
+                
+                html += `
+                    <div class="report-card">
+                        <div class="report-card-header">
+                            <span class="report-date">📅 ${report.date}</span>
+                            <span class="report-status ${statusClass}">${statusText}</span>
+                        </div>
+                        
+                        <div class="report-vitals">
+                            <div><span>Body Temp:</span> <span>${report.vitals.bodyTemp}°C</span></div>
+                            <div><span>Heart Rate:</span> <span>${report.vitals.heartRate} BPM</span></div>
+                            <div><span>SpO2:</span> <span>${report.vitals.spo2}%</span></div>
+                            <div><span>ECG:</span> <span>${report.vitals.ecgValue} mV</span></div>
+                            <div><span>GSR:</span> <span>${report.vitals.gsrValue} µS</span></div>
+                            <div><span>Room Temp:</span> <span>${report.vitals.roomTemp}°C</span></div>
+                        </div>
+                        
+                        <p style="font-size: 12px; color: #6c757d; margin: 10px 0;">
+                            ${report.analysis.diagnosis.substring(0, 100)}...
+                        </p>
+                        
+                        <div class="report-actions">
+                            <button class="btn-view-report" onclick="viewReportDetails(${reports.length - 1 - index})">
+                                👁️ View Details
+                            </button>
+                            <button class="btn-download-report" onclick="downloadStoredReport(${reports.length - 1 - index})">
+                                💾 Download PDF
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            reportsContent.innerHTML = html;
+        }
+
+        // Function: View full report details in popup
+        function viewReportDetails(reportIndex) {
+            const reports = userReports[currentUser.mobile];
+            const report = reports[reportIndex];
+            
+            // Show health notification popup with stored report
+            showHealthNotification(report.analysis);
+        }
+
+        // Function: Download stored report as PDF
+        function downloadStoredReport(reportIndex) {
+            const reports = userReports[currentUser.mobile];
+            const report = reports[reportIndex];
+            
+            // Use stored report data to generate PDF
+            generatePDFFromReport(report);
+        }
+
+        // Function: Generate PDF from stored report data
+        function generatePDFFromReport(report) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // PDF HEADER
+            doc.setFillColor(0, 61, 130);
+            doc.rect(0, 0, 210, 35, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(20);
+            doc.setFont(undefined, 'bold');
+            doc.text('DIGITAL MEDICAL KIT', 105, 15, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.text('Advanced Health Analysis Report', 105, 25, { align: 'center' });
+
+            // PATIENT INFORMATION
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(14);
+            doc.text('PATIENT INFORMATION', 20, 50);
+            
+            doc.setFontSize(10);
+            doc.text(`Name: ${currentUser.name}`, 20, 60);
+            doc.text(`Age: ${currentUser.age} years`, 20, 67);
+            doc.text(`Gender: ${currentUser.gender}`, 20, 74);
+            doc.text(`Patient ID: ${currentUser.mobile}`, 20, 81);
